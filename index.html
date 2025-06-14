@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PeerAssist</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .hidden { display: none; }
+    .error { color: red; }
+    .success { color: green; }
+    input, textarea, button { display: block; margin: 10px 0; padding: 5px; }
+    button { background: #007bff; color: white; border: none; cursor: pointer; }
+    .doubt { border-bottom: 1px solid #ddd; padding: 10px 0; }
+  </style>
+</head>
+<body>
+  <div id="welcome">
+    <h1>PeerAssist</h1>
+    <p id="user-greeting"></p>
+    <button onclick="showRegister()" id="register-btn">Register</button>
+    <button onclick="showLogin()" id="login-btn">Login</button>
+    <button onclick="showPostDoubt()" id="post-doubt-btn" class="hidden">Post Doubt</button>
+    <button onclick="fetchDoubts()">View Doubts</button>
+    <button onclick="fetchNotifications()" id="notifications-btn" class="hidden">Notifications</button>
+    <button onclick="logout()" id="logout-btn" class="hidden">Logout</button>
+  </div>
+
+  <div id="register" class="hidden">
+    <h2>Register</h2>
+    <div id="register-error" class="error"></div>
+    <input type="text" id="reg-username" placeholder="Username">
+    <input type="email" id="reg-email" placeholder="Email">
+    <input type="password" id="reg-password" placeholder="Password">
+    <button onclick="register()">Register</button>
+    <button onclick="showWelcome()">Back</button>
+  </div>
+
+  <div id="login" class="hidden">
+    <h2>Login</h2>
+    <div id="login-error" class="error"></div>
+    <input type="email" id="login-email" placeholder="Email">
+    <input type="password" id="login-password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="showWelcome()">Back</button>
+  </div>
+
+  <div id="post-doubt" class="hidden">
+    <h2>Post Doubt</h2>
+    <div id="post-error" class="error"></div>
+    <div id="post-success" class="success"></div>
+    <input type="text" id="doubt-subject" placeholder="Subject">
+    <textarea id="doubt-description" placeholder="Describe your doubt"></textarea>
+    <button onclick="postDoubt()">Post</button>
+    <button onclick="showWelcome()">Back</button>
+  </div>
+
+  <div id="doubts">
+    <h2>Doubts</h2>
+    <div id="doubts-error" class="error"></div>
+    <div id="doubts-list"></div>
+    <button onclick="showWelcome()">Back</button>
+  </div>
+
+  <div id="notifications" class="hidden">
+    <h2>Notifications</h2>
+    <div id="notifications-error" class="error"></div>
+    <div id="notifications-list"></div>
+    <button onclick="showWelcome()">Back</button>
+  </div>
+
+  <script>
+    const API_BASE = 'https://prod-api.peeracademic.in/api';
+
+    function showWelcome() {
+      document.querySelectorAll('div').forEach(div => div.classList.add('hidden'));
+      document.getElementById('welcome').classList.remove('hidden');
+      const token = localStorage.getItem('token');
+      const username = localStorage.getItem('username');
+      document.getElementById('user-greeting').textContent = token ? `Hello, ${username}` : '';
+      document.getElementById('register-btn').classList.toggle('hidden', !!token);
+      document.getElementById('login-btn').classList.toggle('hidden', !!token);
+      document.getElementById('post-doubt-btn').classList.toggle('hidden', !token);
+      document.getElementById('notifications-btn').classList.toggle('hidden', !token);
+      document.getElementById('logout-btn').classList.toggle('hidden', !token);
+    }
+
+    function showRegister() {
+      document.querySelectorAll('div').forEach(div => div.classList.add('hidden'));
+      document.getElementById('register').classList.remove('hidden');
+    }
+
+    function showLogin() {
+      document.querySelectorAll('div').forEach(div => div.classList.add('hidden'));
+      document.getElementById('login').classList.remove('hidden');
+    }
+
+    function showPostDoubt() {
+      document.querySelectorAll('div').forEach(div => div.classList.add('hidden'));
+      document.getElementById('post-doubt').classList.remove('hidden');
+    }
+
+    async function register() {
+      const username = document.getElementById('reg-username').value;
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+      const errorDiv = document.getElementById('register-error');
+      try {
+        const res = await fetch(`${API_BASE}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', username);
+        showWelcome();
+      } catch (error) {
+        errorDiv.textContent = error.message;
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const errorDiv = document.getElementById('login-error');
+      try {
+        const res = await fetch(`${API_BASE}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.username);
+        showWelcome();
+      } catch (error) {
+        errorDiv.textContent = error.message;
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      showWelcome();
+    }
+
+    async function postDoubt() {
+      const subject = document.getElementById('doubt-subject').value;
+      const description = document.getElementById('doubt-description').value;
+      const errorDiv = document.getElementById('post-error');
+      const successDiv = document.getElementById('post-success');
+      try {
+        const res = await fetch(`${API_BASE}/doubts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ subject, description })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to post');
+        successDiv.textContent = 'Doubt posted!';
+        errorDiv.textContent = '';
+        setTimeout(() => fetchDoubts(), 1000);
+      } catch (error) {
+        errorDiv.textContent = error.message;
+        successDiv.textContent = '';
+      }
+    }
+
+    async function fetchDoubts() {
+      document.querySelectorAll('div').forEach(div => div.classList.add('hidden'));
+      document.getElementById('doubts').classList.remove('hidden');
+      const errorDiv = document.getElementById('doubts-error');
+      const listDiv = document.getElementById('doubts-list');
+      try {
+        const res = await fetch(`${API_BASE}/doubts`);
+        const doubts = await res.json();
+        if (!res.ok) throw new Error(doubts.error || 'Failed to fetch doubts');
+        listDiv.innerHTML = doubts.map(d => `
+          <div class="doubt">
+            <h3>${d.subject}</h3>
+            <p>${d.description}</p>
+            <p>By: ${d.username}</p>
+            ${localStorage.getItem('token') && d.username !== localStorage.getItem('username') ? `
+              <textarea id="response-${d.id}" placeholder="Your response"></textarea>
+              <button onclick="respond('${d.id}')">Respond</button>
+            ` : ''}
+          </div>
+        `).join('');
+        errorDiv.textContent = '';
+      } catch (error) {
+        errorDiv.textContent = error.message;
+      }
+    }
+
+    async function respond(doubtId) {
+      const message = document.getElementById(`response-${doubtId}`).value;
+      const errorDiv = document.getElementById('doubts-error');
+      try {
+        const res = await fetch(`${API_BASE}/responses`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ doubt_id: doubtId, message })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to respond');
+        fetchDoubts();
+      } catch (error) {
+        errorDiv.textContent = error.message;
+      }
+    }
+
+    async function fetchNotifications() {
+      document.querySelectorAll('div').forEach(div => div.classList.add('hidden'));
+      document.getElementById('notifications').classList.remove('hidden');
+      const errorDiv = document.getElementById('notifications-error');
+      const listDiv = document.getElementById('notifications-list');
+      try {
+        const res = await fetch(`${API_BASE}/notifications`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const notifications = await res.json();
+        if (!res.ok) throw new Error(notifications.error || 'Failed to fetch notifications');
+        listDiv.innerHTML = notifications.map(n => `
+          <p>${n.message} - ${new Date(n.created_at).toLocaleString()}</p>
+        `).join('');
+        errorDiv.textContent = '';
+      } catch (error) {
+        errorDiv.textContent = error.message;
+      }
+    }
+
+    showWelcome();
+  </script>
+</body>
+</html>
